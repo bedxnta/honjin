@@ -1,0 +1,974 @@
+/* ==========================================================================
+   Honjin (本陣) - The Craftsman's PDF Toolkit
+   Theme: Washi & Sumi Ink (Paper Aesthetic)
+   ========================================================================== */
+
+:root {
+  /* Warm Washi Paper Palette (Light Mode Default) */
+  --bg-app: #f9f6f0;
+  --bg-sheet: #ffffff;
+  --bg-subtle: #f3efe6;
+  --bg-hover: #ede7dc;
+  --bg-active: #e5ded2;
+
+  /* Ink Tones */
+  --ink-primary: #1f1d1a;
+  --ink-secondary: #57524a;
+  --ink-muted: #8c857b;
+  --ink-faint: #b8b1a5;
+
+  /* Vermilion Hanko Accent (Traditional Japanese Seal Red) */
+  --hanko-red: #c53d26;
+  --hanko-hover: #ad321d;
+  --hanko-subtle: #fbeee9;
+  --hanko-border: #f2cbbe;
+
+  /* Deep Indigo & Earth accents */
+  --indigo-accent: #26384a;
+  --indigo-subtle: #ebf1f6;
+  --bamboo-green: #3b6348;
+  --bamboo-subtle: #eaf3ed;
+
+  /* Borders & Dividers */
+  --border-paper: #e7e0d4;
+  --border-delicate: #f0ebe2;
+  --border-strong: #cfc6b6;
+
+  /* Tactile Shadows (warm undertones) */
+  --shadow-subtle: 0 1px 3px rgba(35, 30, 25, 0.04), 0 1px 2px rgba(35, 30, 25, 0.03);
+  --shadow-card: 0 4px 12px -2px rgba(35, 30, 25, 0.05), 0 2px 4px rgba(35, 30, 25, 0.03);
+  --shadow-hover: 0 10px 24px -4px rgba(35, 30, 25, 0.08), 0 4px 8px rgba(35, 30, 25, 0.04);
+  --shadow-modal: 0 20px 48px -8px rgba(25, 20, 15, 0.16), 0 8px 16px rgba(25, 20, 15, 0.06);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Fonts */
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-kanji: 'Shippori Mincho', 'Noto Serif JP', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Transition */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Deep Sumi Ink Mode (Dark Mode) */
+body.theme-dark {
+  --bg-app: #151413;
+  --bg-sheet: #1e1c1a;
+  --bg-subtle: #272421;
+  --bg-hover: #312e2a;
+  --bg-active: #3c3833;
+
+  --ink-primary: #f5f2ec;
+  --ink-secondary: #b5ada3;
+  --ink-muted: #857e75;
+  --ink-faint: #57524a;
+
+  --hanko-red: #e04e35;
+  --hanko-hover: #f15d44;
+  --hanko-subtle: #331d19;
+  --hanko-border: #5a2c24;
+
+  --indigo-accent: #6b99c7;
+  --indigo-subtle: #192532;
+  --bamboo-green: #68a87b;
+  --bamboo-subtle: #192b1f;
+
+  --border-paper: #2e2a25;
+  --border-delicate: #24211d;
+  --border-strong: #454038;
+
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 24px 50px rgba(0, 0, 0, 0.7);
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--ink-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+/* Paper Grain Texture (Subtle fiber effect via SVG pattern) */
+.paper-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+body.theme-dark .paper-grain {
+  opacity: 0.025;
+}
+
+.container {
+  max-width: 1160px;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+/* ==========================================================================
+   Header & Hanko Seal
+   ========================================================================== */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: rgba(249, 246, 240, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-paper);
+  transition: background-color var(--transition-smooth), border-color var(--transition-smooth);
+}
+
+body.theme-dark .site-header {
+  background-color: rgba(21, 20, 19, 0.88);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 4.25rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  text-decoration: none;
+  color: var(--ink-primary);
+}
+
+/* Traditional Japanese Hanko Stamp Logo */
+.hanko-seal {
+  font-family: var(--font-kanji);
+  font-weight: 700;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #faf7f2;
+  background-color: var(--hanko-red);
+  width: 2.35rem;
+  height: 2.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(197, 61, 38, 0.28);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  position: relative;
+  letter-spacing: -0.05em;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.brand:hover .hanko-seal {
+  transform: rotate(-3deg) scale(1.05);
+  background-color: var(--hanko-hover);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bamboo-green);
+  background: var(--bamboo-subtle);
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(59, 99, 72, 0.15);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+  position: relative;
+}
+
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.6;
+  animation: pulse-ring 2.4s infinite cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.btn-icon {
+  background: var(--bg-sheet);
+  border: 1px solid var(--border-paper);
+  color: var(--ink-secondary);
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-subtle);
+}
+
+.btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--ink-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+body.theme-light .moon-icon { display: block; }
+body.theme-light .sun-icon { display: none; }
+body.theme-dark .moon-icon { display: none; }
+body.theme-dark .sun-icon { display: block; }
+
+/* ==========================================================================
+   Hero Section
+   ========================================================================== */
+.hero-section {
+  padding-block: 3.5rem 2rem;
+  position: relative;
+}
+
+.hero-content {
+  text-align: center;
+  max-width: 780px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-muted);
+  margin-bottom: 1rem;
+}
+
+.vermilion-slash {
+  color: var(--hanko-red);
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: var(--ink-primary);
+  margin-bottom: 1.15rem;
+}
+
+.hero-desc {
+  font-size: 1.125rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+  max-width: 620px;
+  margin-inline: auto;
+  margin-bottom: 2.25rem;
+}
+
+/* ==========================================================================
+   Controls Toolbar: Search & Category Filter Pills
+   ========================================================================== */
+.controls-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.search-input-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  height: 3rem;
+  padding-left: 2.75rem;
+  padding-right: 3rem;
+  background-color: var(--bg-sheet);
+  border: 1px solid var(--border-paper);
+  border-radius: var(--radius-full);
+  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  color: var(--ink-primary);
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.search-input-wrapper input:focus {
+  border-color: var(--hanko-red);
+  box-shadow: 0 0 0 3px var(--hanko-subtle), var(--shadow-hover);
+}
+
+.search-input-wrapper input::placeholder {
+  color: var(--ink-muted);
+}
+
+.shortcut-hint {
+  position: absolute;
+  right: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background: var(--bg-subtle);
+  color: var(--ink-muted);
+  border: 1px solid var(--border-paper);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.cat-pill {
+  background: var(--bg-sheet);
+  border: 1px solid var(--border-paper);
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.45rem 1.1rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-subtle);
+}
+
+.cat-pill:hover {
+  background: var(--bg-hover);
+  color: var(--ink-primary);
+  border-color: var(--border-strong);
+}
+
+.cat-pill.active {
+  background: var(--ink-primary);
+  color: var(--bg-sheet);
+  border-color: var(--ink-primary);
+  box-shadow: 0 2px 8px rgba(31, 29, 26, 0.18);
+}
+
+body.theme-dark .cat-pill.active {
+  background: #f5f2ec;
+  color: #1e1c1a;
+  border-color: #f5f2ec;
+}
+
+/* ==========================================================================
+   Tools Grid & Tactile Cards
+   ========================================================================== */
+.tools-section {
+  padding-block: 1rem 4rem;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 1.25rem;
+}
+
+.tool-card {
+  background-color: var(--bg-sheet);
+  border: 1px solid var(--border-paper);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
+  overflow: hidden;
+}
+
+/* Subtle corner washi deckle fold indicator */
+.tool-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(135deg, transparent 50%, var(--bg-hover) 50%);
+  border-bottom-left-radius: 4px;
+  opacity: 0.8;
+  transition: transform var(--transition-fast);
+}
+
+.tool-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--border-strong);
+}
+
+.tool-card:hover::before {
+  transform: scale(1.3);
+}
+
+.tool-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.tool-icon-box {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-subtle);
+  color: var(--ink-primary);
+  border: 1px solid var(--border-paper);
+  transition: all var(--transition-fast);
+}
+
+.tool-card:hover .tool-icon-box {
+  background-color: var(--hanko-subtle);
+  color: var(--hanko-red);
+  border-color: var(--hanko-border);
+}
+
+.tool-icon-box svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.tool-badge {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  background: var(--bg-subtle);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-paper);
+}
+
+.tool-title {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tool-arrow {
+  color: var(--ink-muted);
+  font-size: 1rem;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.tool-card:hover .tool-arrow {
+  transform: translateX(3px) translateY(-3px);
+  color: var(--hanko-red);
+}
+
+.tool-desc {
+  font-size: 0.875rem;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+  margin-bottom: 0;
+  flex-grow: 1;
+}
+
+.no-results {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--ink-secondary);
+}
+
+.no-results.hidden {
+  display: none;
+}
+
+.btn-subtle {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--ink-primary);
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-full);
+  margin-top: 1rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-subtle:hover {
+  background: var(--bg-hover);
+}
+
+/* ==========================================================================
+   Zen Manifesto Card (Paper Sheet Style)
+   ========================================================================== */
+.zen-manifesto {
+  padding-block: 2rem 5rem;
+}
+
+.paper-sheet-card {
+  background-color: var(--bg-sheet);
+  border: 1px solid var(--border-paper);
+  border-radius: var(--radius-xl);
+  padding: clamp(2rem, 5vw, 3.5rem);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Traditional deckled corner */
+.sheet-corner-fold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, transparent 50%, var(--bg-subtle) 50%);
+  border-bottom-left-radius: 8px;
+  box-shadow: -2px 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2.25rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-paper);
+}
+
+.sheet-hanko {
+  font-family: var(--font-kanji);
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--hanko-red);
+  background-color: var(--hanko-subtle);
+  border: 1.5px solid var(--hanko-border);
+  width: 3.25rem;
+  height: 3.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+}
+
+.sheet-header h3 {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.sheet-subtitle {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.sheet-point {
+  display: flex;
+  flex-direction: column;
+}
+
+.point-num {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--hanko-red);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.sheet-point h4 {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.sheet-point p {
+  font-size: 0.9rem;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+.site-footer {
+  border-top: 1px solid var(--border-paper);
+  background-color: var(--bg-sheet);
+  padding-block: 1.75rem;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.footer-logo {
+  font-family: var(--font-kanji);
+  font-weight: 700;
+  color: var(--hanko-red);
+  font-size: 1.1rem;
+}
+
+/* ==========================================================================
+   Universal Tool Dialog & Modal
+   ========================================================================== */
+.tool-dialog {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: auto;
+  max-width: 900px;
+  width: calc(100% - 2rem);
+  max-height: 90vh;
+  z-index: 100;
+}
+
+.tool-dialog::backdrop {
+  background: rgba(25, 23, 20, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 180ms ease-out;
+}
+
+.dialog-frame {
+  background: var(--bg-sheet);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: slideUp 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid var(--border-paper);
+  background-color: var(--bg-sheet);
+}
+
+.tool-title-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dialog-tool-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  background-color: var(--hanko-subtle);
+  color: var(--hanko-red);
+  border: 1px solid var(--hanko-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-tool-icon svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.dialog-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink-primary);
+}
+
+.dialog-desc {
+  font-size: 0.8125rem;
+  color: var(--ink-secondary);
+}
+
+.btn-close {
+  background: transparent;
+  border: 1px solid var(--border-paper);
+  color: var(--ink-muted);
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-close:hover {
+  background: var(--bg-hover);
+  color: var(--ink-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-close svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.dialog-body {
+  padding: 1.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ==========================================================================
+   Buttons & Common UI Form Controls
+   ========================================================================== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: var(--hanko-red);
+  color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 0.65rem 1.4rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(197, 61, 38, 0.28);
+  transition: all var(--transition-fast);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--hanko-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(197, 61, 38, 0.35);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: var(--bg-sheet);
+  color: var(--ink-primary);
+  border: 1px solid var(--border-paper);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+/* ==========================================================================
+   Toast Notifications
+   ========================================================================== */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background-color: var(--bg-sheet);
+  border: 1px solid var(--border-strong);
+  color: var(--ink-primary);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: toastIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 380px;
+}
+
+.toast.toast-success {
+  border-left: 4px solid var(--bamboo-green);
+}
+
+.toast.toast-error {
+  border-left: 4px solid var(--hanko-red);
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header-actions .privacy-pill {
+    display: none;
+  }
+
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .category-pills {
+    justify-content: flex-start;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 0.5rem;
+    flex-wrap: nowrap;
+  }
+
+  .sheet-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
