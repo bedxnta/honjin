@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Honjin — Minimalist Papercraft PDF Toolkit</title>
+  <meta name="description" content="A calm, private, browser-based PDF toolkit. Merge, split, organize, sign, and convert documents locally with zero file uploads.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23c53d26'/><text x='50' y='68' font-size='56' text-anchor='middle' fill='%23faf7f2' font-family='serif' font-weight='bold'>本</text></svg>">
+  
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/tools.css">
+</head>
+<body class="theme-light">
+  <!-- Subtle tactile paper grain overlay -->
+  <div class="paper-grain" aria-hidden="true"></div>
+
+  <!-- Main Navigation / Header -->
+  <header class="site-header">
+    <div class="header-inner container">
+      <a href="#" class="brand" aria-label="Honjin Home">
+        <span class="hanko-seal" title="Honjin - 本">本</span>
+        <div class="brand-text">
+          <span class="brand-title">Honjin</span>
+          <span class="brand-subtitle">PDF Toolkit</span>
+        </div>
+      </a>
+
+      <div class="header-actions">
+        <div class="privacy-pill" title="Every operation runs completely inside your browser using WebAssembly and Web APIs.">
+          <span class="pulse-dot"></span>
+          <span>100% On-Device • Zero Uploads</span>
+        </div>
+        <button id="theme-toggle" class="btn-icon" aria-label="Toggle paper theme" title="Toggle warm paper / deep sumi ink mode">
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="container hero-content">
+        <div class="hero-badge">
+          <span class="vermilion-slash">/</span> Document Craftsmanship
+        </div>
+        <h1 class="hero-title">
+          The quiet art of working with paper.
+        </h1>
+        <p class="hero-desc">
+          Honjin is a pure, uncluttered suite of document essentials. Built with tactile restraint, lightning client-side execution, and absolute respect for your private files.
+        </p>
+
+        <!-- Quick Search & Category Bar -->
+        <div class="controls-toolbar">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="tool-search" placeholder="Find a tool (type '/' or tool name)..." autocomplete="off" spellcheck="false">
+            <kbd class="shortcut-hint">/</kbd>
+          </div>
+
+          <div class="category-pills" role="tablist" aria-label="Filter tools by category">
+            <button class="cat-pill active" data-category="all" role="tab" aria-selected="true">All Tools</button>
+            <button class="cat-pill" data-category="organize" role="tab" aria-selected="false">Organize</button>
+            <button class="cat-pill" data-category="edit" role="tab" aria-selected="false">Edit & Sign</button>
+            <button class="cat-pill" data-category="convert" role="tab" aria-selected="false">Convert</button>
+            <button class="cat-pill" data-category="pages" role="tab" aria-selected="false">Page Tools</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tools Showcase Grid (Pre-rendered for instant display & offline file:// support) -->
+    <section class="tools-section">
+      <div class="container">
+        <div class="tools-grid" id="tools-grid">
+          
+          <!-- 1. Organize Pages -->
+          <article class="tool-card" data-id="organize" data-category="pages" tabindex="0" role="button" aria-label="Organize Pages">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </div>
+              <span class="tool-badge">Organize</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Organize Pages</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">View live page thumbnails to reorder, rotate, or delete pages visually.</p>
+          </article>
+
+          <!-- 2. Sign PDF -->
+          <article class="tool-card" data-id="sign" data-category="edit" tabindex="0" role="button" aria-label="Sign PDF">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 3.5a2.12 2.12 0 0 1 3 3L7 22l-5 1 1-5L19.5 2.5a2.12 2.12 0 0 1 3 3z"/><path d="m15 6 3 3"/></svg>
+              </div>
+              <span class="tool-badge">Signature</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Sign PDF</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Draw or type your signature and place it anywhere on your document.</p>
+          </article>
+
+          <!-- 3. Merge PDF -->
+          <article class="tool-card" data-id="merge" data-category="organize" tabindex="0" role="button" aria-label="Merge PDF">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/><path d="m10 14 4-4"/><path d="m14 14-4-4"/></svg>
+              </div>
+              <span class="tool-badge">Combine</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Merge PDF</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Combine multiple PDF files in your preferred sequence into one unified document.</p>
+          </article>
+
+          <!-- 4. Split PDF -->
+          <article class="tool-card" data-id="split" data-category="organize" tabindex="0" role="button" aria-label="Split PDF">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16" y1="3" x2="16" y2="21"/><path d="M8 7l-5 5 5 5"/><path d="M3 12h13"/><path d="M19 12h2"/></svg>
+              </div>
+              <span class="tool-badge">Split</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Split PDF</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Click thumbnails to select pages to extract into a single PDF, or bundle all pages into a ZIP.</p>
+          </article>
+
+          <!-- 5. Images to PDF -->
+          <article class="tool-card" data-id="images-to-pdf" data-category="convert" tabindex="0" role="button" aria-label="Images to PDF">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              <span class="tool-badge">Convert</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Images to PDF</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Convert PNG, JPG, and WebP images into a polished PDF document with margin and preview controls.</p>
+          </article>
+
+          <!-- 6. PDF to Images -->
+          <article class="tool-card" data-id="pdf-to-images" data-category="convert" tabindex="0" role="button" aria-label="PDF to Images">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="1.5"/><path d="m8 17 2-2 4 4"/></svg>
+              </div>
+              <span class="tool-badge">Render</span>
+            </div>
+            <h3 class="tool-title">
+              <span>PDF to Images</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Click thumbnails to select pages to export into high-resolution PNG or JPEG images.</p>
+          </article>
+
+          <!-- 7. Rotate PDF -->
+          <article class="tool-card" data-id="rotate" data-category="pages" tabindex="0" role="button" aria-label="Rotate PDF">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              </div>
+              <span class="tool-badge">Rotate</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Rotate PDF</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Rotate individual pages or entire documents with live visual orientation preview.</p>
+          </article>
+
+          <!-- 8. Delete Pages -->
+          <article class="tool-card" data-id="delete-pages" data-category="pages" tabindex="0" role="button" aria-label="Delete Pages">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </div>
+              <span class="tool-badge">Delete</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Delete Pages</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Click thumbnails to visually stamp and discard unwanted pages from your document.</p>
+          </article>
+
+          <!-- 9. Add Watermark -->
+          <article class="tool-card" data-id="watermark" data-category="edit" tabindex="0" role="button" aria-label="Add Watermark">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+              </div>
+              <span class="tool-badge">Watermark</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Add Watermark</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Stamp customizable text or status labels across all pages with opacity and angle controls.</p>
+          </article>
+
+          <!-- 10. Add Page Numbers -->
+          <article class="tool-card" data-id="page-numbers" data-category="edit" tabindex="0" role="button" aria-label="Add Page Numbers">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M12 8h4"/><path d="M14 6v8"/></svg>
+              </div>
+              <span class="tool-badge">Page Numbers</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Add Page Numbers</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Add header or footer page numbers with configurable position, format, and cover page skipping.</p>
+          </article>
+
+          <!-- 11. PDF to Text -->
+          <article class="tool-card" data-id="pdf-to-text" data-category="convert" tabindex="0" role="button" aria-label="PDF to Text">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+              </div>
+              <span class="tool-badge">Extract</span>
+            </div>
+            <h3 class="tool-title">
+              <span>PDF to Text</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Extract selectable text layers into readable plaintext with one-click copying and .txt export.</p>
+          </article>
+
+          <!-- 12. Crop & Trim PDF -->
+          <article class="tool-card" data-id="crop-pdf" data-category="pages" tabindex="0" role="button" aria-label="Crop PDF">
+            <div class="tool-card-header">
+              <div class="tool-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+              </div>
+              <span class="tool-badge">Crop & Trim</span>
+            </div>
+            <h3 class="tool-title">
+              <span>Crop & Trim</span>
+              <span class="tool-arrow">↗</span>
+            </h3>
+            <p class="tool-desc">Interactively trim margins or crop viewports with draggable resize handles and live page preview.</p>
+          </article>
+
+        </div>
+
+        <!-- No results message -->
+        <div id="no-results" class="no-results hidden">
+          <p>No tools matched your search.</p>
+          <button class="btn-subtle" id="reset-search">View all tools</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Clean, un-cluttered footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <span class="footer-logo">本</span>
+        <span>Honjin • Minimalist PDF Toolkit</span>
+      </div>
+      <div class="footer-right">
+        <span>Files are processed locally on your device.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Universal Tool Workspace Modal (Dialog) -->
+  <dialog id="tool-dialog" class="tool-dialog">
+    <div class="dialog-frame">
+      <div class="dialog-header">
+        <div class="tool-title-group">
+          <span class="dialog-tool-icon" id="dialog-icon"></span>
+          <div>
+            <h2 id="dialog-title" class="dialog-title">Tool Name</h2>
+            <p id="dialog-desc" class="dialog-desc">Tool description goes here.</p>
+          </div>
+        </div>
+        <button id="dialog-close" class="btn-close" aria-label="Close tool">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="dialog-body" id="dialog-body">
+        <!-- Content dynamically injected per tool -->
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- CDN Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- Application Script (Standard script, zero CORS restriction on file://) -->
+  <script src="js/app.js"></script>
+</body>
+</html>
