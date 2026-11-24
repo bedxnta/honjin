@@ -717,6 +717,30 @@ body.theme-light .cat-pill.active {
   font-size: 1.1rem;
 }
 
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.footer-sep {
+  opacity: 0.4;
+}
+
+.footer-link {
+  color: var(--ink-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.footer-link:hover {
+  color: var(--hanko-red);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ==========================================================================
    Universal Tool Dialog & Modal (Raycast-Style Dark Glass)
    ========================================================================== */
