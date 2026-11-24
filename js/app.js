@@ -3005,6 +3005,9 @@ const TOOL_RENDERERS = {
 
 function initApp() {
   UI.init();
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
 
   // 1. Theme Toggle
   const themeToggleBtn = document.getElementById('theme-toggle');
