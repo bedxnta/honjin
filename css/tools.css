@@ -743,6 +743,14 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
   width: 100%;
+  color: var(--ink-primary);
+}
+
+#crop-page-indicator {
+  color: var(--ink-primary) !important;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.8125rem;
 }
 
 .crop-stage {

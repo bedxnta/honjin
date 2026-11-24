@@ -2622,7 +2622,7 @@ function renderCropTool(container) {
         <div class="crop-preview-area">
           <div class="crop-page-nav">
             <button id="btn-crop-prev" class="btn-subtle" style="padding:0.25rem 0.6rem; font-size:0.75rem;">◀ Prev</button>
-            <span id="crop-page-indicator" style="font-weight:600; font-family:var(--font-mono); font-size:0.8125rem;">Page 1 of 1</span>
+            <span id="crop-page-indicator" style="font-weight:600; font-family:var(--font-mono); font-size:0.8125rem; color:var(--ink-primary);">Page 1 of 1</span>
             <button id="btn-crop-next" class="btn-subtle" style="padding:0.25rem 0.6rem; font-size:0.75rem;">Next ▶</button>
           </div>
           <div class="crop-stage" id="crop-stage">
@@ -3008,7 +3008,7 @@ function initApp() {
 
   // 1. Theme Toggle
   const themeToggleBtn = document.getElementById('theme-toggle');
-  const savedTheme = localStorage.getItem('honjin-theme') || 'light';
+  const savedTheme = localStorage.getItem('honjin-theme') || 'dark';
   if (savedTheme === 'dark') {
     document.body.classList.remove('theme-light');
     document.body.classList.add('theme-dark');
@@ -3061,6 +3061,13 @@ function initApp() {
 
   // 3. Search and Category Filter
   const searchInput = document.getElementById('tool-search');
+  const shortcutHint = document.getElementById('search-shortcut-hint');
+  if (shortcutHint) {
+    shortcutHint.textContent = '/';
+  }
+  if (searchInput) {
+    searchInput.placeholder = "Search tools (type '/' or name)...";
+  }
   const categoryPills = document.querySelectorAll('.cat-pill');
   const resetSearchBtn = document.getElementById('reset-search');
   const noResultsEl = document.getElementById('no-results');
@@ -3102,7 +3109,7 @@ function initApp() {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === '/' && document.activeElement !== searchInput) {
+    if ((e.key === '/' || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) && document.activeElement !== searchInput) {
       if (UI.dialog && UI.dialog.open) return;
       e.preventDefault();
       searchInput?.focus();
