@@ -2,7 +2,9 @@
 
 > Fast, private, client-side PDF utility suite with zero server uploads.
 
-![Honjin Banner](https://raw.githubusercontent.com/bedantad/honjin/main/screenshot.png) *(Optional banner placeholder)*
+<p align="center">
+  <img src="assets/banner.svg" alt="Honjin — Minimalist PDF Toolkit" width="100%">
+</p>
 
 Honjin (本陣) is a pure, client-side document toolkit built with tactile engineering restraint. Every document operation runs directly inside your browser using WebAssembly and Web APIs (`pdf-lib`, `PDF.js`, and HTML5 Canvas)—your sensitive files never touch any external server.
 
