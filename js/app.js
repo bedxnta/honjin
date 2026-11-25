@@ -126,6 +126,241 @@ const PDFEngine = {
       }
     }
     return Array.from(pages).sort((a, b) => a - b);
+  },
+
+  /**
+   * Reconstruct clean spatial text layout from a PDF.js page
+   * Preserves horizontal gaps, columns, indentations, and vertical paragraph breaks.
+   */
+  async extractPageLayoutText(page) {
+    const textContent = await page.getTextContent({ normalizeWhitespace: false });
+    const items = textContent.items.filter(item => item.str && item.str.trim().length > 0);
+    
+    if (items.length === 0) {
+      return { text: '', lines: [], charCount: 0, isScanned: true };
+    }
+
+    // Sort items vertically (descending Y from top to bottom)
+    const sorted = [...items].sort((a, b) => {
+      const yA = a.transform[5];
+      const yB = b.transform[5];
+      if (Math.abs(yA - yB) > 3.5) {
+        return yB - yA; // top first
+      }
+      return a.transform[4] - b.transform[4]; // left to right
+    });
+
+    // Group items into horizontal lines
+    const lineBuckets = [];
+    for (const item of sorted) {
+      const x = item.transform[4];
+      const y = item.transform[5];
+      const width = item.width || 0;
+      const height = item.height || Math.abs(item.transform[0]) || 12;
+
+      let bucket = lineBuckets.find(b => Math.abs(b.y - y) <= Math.max(3.5, height * 0.4));
+      if (!bucket) {
+        bucket = { y, height, items: [] };
+        lineBuckets.push(bucket);
+      }
+      bucket.items.push({ x, y, width, height, str: item.str });
+    }
+
+    // Sort buckets vertically (top to bottom)
+    lineBuckets.sort((a, b) => b.y - a.y);
+
+    const formattedLines = [];
+    let avgLineHeight = 12;
+    if (lineBuckets.length > 0) {
+      const totalH = lineBuckets.reduce((acc, b) => acc + (b.height || 12), 0);
+      avgLineHeight = totalH / lineBuckets.length;
+    }
+
+    for (let i = 0; i < lineBuckets.length; i++) {
+      const bucket = lineBuckets[i];
+      // Sort items within line from left to right
+      bucket.items.sort((a, b) => a.x - b.x);
+
+      let lineText = '';
+      let prevEnd = null;
+
+      for (const item of bucket.items) {
+        if (prevEnd !== null) {
+          const gap = item.x - prevEnd;
+          if (gap > 24) {
+            lineText += '    ';
+          } else if (gap > 3.5 && !lineText.endsWith(' ') && !item.str.startsWith(' ')) {
+            lineText += ' ';
+          }
+        }
+        lineText += item.str;
+        prevEnd = item.x + item.width;
+      }
+
+      lineText = lineText.trimEnd();
+      if (!lineText) continue;
+
+      let isParagraphBreak = false;
+      if (i > 0) {
+        const prevBucket = lineBuckets[i - 1];
+        const vGap = prevBucket.y - bucket.y;
+        if (vGap > avgLineHeight * 1.65) {
+          isParagraphBreak = true;
+        }
+      }
+
+      formattedLines.push({
+        y: bucket.y,
+        text: lineText,
+        isParagraphBreak
+      });
+    }
+
+    let fullText = '';
+    for (let i = 0; i < formattedLines.length; i++) {
+      const line = formattedLines[i];
+      if (i > 0) {
+        fullText += line.isParagraphBreak ? '\n\n' : '\n';
+      }
+      fullText += line.text;
+    }
+
+    const charCount = fullText.trim().length;
+    return {
+      text: fullText,
+      lines: formattedLines,
+      charCount,
+      isScanned: charCount < 20
+    };
+  },
+
+  /**
+   * On-device OCR using Tesseract.js WebAssembly
+   */
+  async ocrPageToText(pdfDoc, pageNumber, onProgress) {
+    if (!window.Tesseract) {
+      throw new Error('Tesseract.js OCR engine is not loaded. Please check your internet connection or reload.');
+    }
+    const canvas = document.createElement('canvas');
+    await PDFEngine.renderPageToCanvas(pdfDoc, pageNumber, canvas, 2.0);
+
+    const result = await window.Tesseract.recognize(canvas, 'eng', {
+      logger: (m) => {
+        if (onProgress && m.status === 'recognizing text') {
+          onProgress(Math.round((m.progress || 0) * 100));
+        }
+      }
+    });
+
+    const ocrText = (result.data && result.data.text) ? result.data.text.trim() : '';
+    return {
+      text: ocrText,
+      confidence: result.data ? Math.round(result.data.confidence) : 0
+    };
+  },
+
+  /**
+   * Generate a standard Microsoft Word (.docx) file from extracted pages
+   * Uses window.JSZip to build valid OpenXML archive client-side.
+   */
+  async generateDocxBlob(pagesData) {
+    if (!window.JSZip) throw new Error('JSZip library not available');
+
+    const zip = new window.JSZip();
+
+    // 1. [Content_Types].xml
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+    zip.file('[Content_Types].xml', contentTypesXml);
+
+    // 2. _rels/.rels
+    const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+    zip.file('_rels/.rels', rootRelsXml);
+
+    // 3. word/document.xml
+    function escapeXml(unsafe) {
+      return (unsafe || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    let bodyXml = '';
+    pagesData.forEach((p, idx) => {
+      // Page Heading
+      bodyXml += `<w:p>
+        <w:pPr>
+          <w:spacing w:before="240" w:after="120"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:color w:val="0F172A"/>
+          </w:rPr>
+          <w:t>Page ${p.pageNum}</w:t>
+        </w:r>
+      </w:p>`;
+
+      const paragraphs = (p.text || '').split(/\n\n+/);
+      paragraphs.forEach((para) => {
+        const trimmed = para.trim();
+        if (!trimmed) return;
+        bodyXml += `<w:p>
+          <w:pPr>
+            <w:spacing w:after="160" w:line="276" w:lineRule="auto"/>
+          </w:pPr>`;
+        const lines = trimmed.split(/\n/);
+        lines.forEach((line, lIdx) => {
+          if (lIdx > 0) {
+            bodyXml += `<w:r><w:br/></w:r>`;
+          }
+          bodyXml += `<w:r>
+            <w:rPr>
+              <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+              <w:sz w:val="22"/>
+              <w:color w:val="1E293B"/>
+            </w:rPr>
+            <w:t xml:space="preserve">${escapeXml(line)}</w:t>
+          </w:r>`;
+        });
+        bodyXml += `</w:p>`;
+      });
+
+      // Page break if not last page
+      if (idx < pagesData.length - 1) {
+        bodyXml += `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
+      }
+    });
+
+    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    ${bodyXml}
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+    zip.file('word/document.xml', docXml);
+
+    return await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
   }
 };
 
@@ -154,17 +389,17 @@ const UI = {
     }
 
     if (this.dialog) {
-      this.dialog.addEventListener('click', (e) => {
-        const rect = this.dialog.getBoundingClientRect();
-        const isInDialog = (
-          rect.top <= e.clientY &&
-          e.clientY <= rect.top + rect.height &&
-          rect.left <= e.clientX &&
-          e.clientX <= rect.left + rect.width
-        );
-        if (!isInDialog) {
-          this.closeDialog();
+      // Prevent scrolling the background when wheeling over the backdrop
+      this.dialog.addEventListener('wheel', (e) => {
+        if (e.target === this.dialog) {
+          e.preventDefault();
         }
+      }, { passive: false });
+
+      // Restore body scroll lock on native dialog close / cancel
+      this.dialog.addEventListener('close', () => {
+        document.body.classList.remove('modal-open');
+        this.dialogBody.innerHTML = '';
       });
     }
 
@@ -185,6 +420,8 @@ const UI = {
 
     renderContent(this.dialogBody);
 
+    document.body.classList.add('modal-open');
+
     if (typeof this.dialog.showModal === 'function') {
       this.dialog.showModal();
     } else {
@@ -194,6 +431,7 @@ const UI = {
 
   closeDialog() {
     if (this.dialog) {
+      document.body.classList.remove('modal-open');
       if (typeof this.dialog.close === 'function') {
         this.dialog.close();
       } else {
@@ -2500,44 +2738,449 @@ function renderPageNumbersTool(container) {
   });
 }
 
-// 11. PDF to Text
+// 11. PDF to Text (Document Paper View & On-Device OCR)
 function renderPdfToTextTool(container) {
-  let extractedText = '';
+  let pdfDoc = null;
   let originalFilename = '';
+  let pagesData = []; // Array of { pageNum, text, lines, charCount, isScanned, isOcrDone, isOcrRunning, ocrProgress }
+  let activeView = 'document'; // 'document' | 'raw'
+  let searchQuery = '';
 
   container.innerHTML = `
     <div id="drop-area"></div>
-    <div id="text-workspace" style="display:none;">
-      <div class="tool-options-panel">
-        <div class="option-group">
-          <div class="option-label">
-            <span>Extracted Text</span>
-            <button id="btn-copy-text" class="btn-subtle" style="margin:0; padding:0.25rem 0.75rem; font-size:0.75rem;">
-              Copy to Clipboard
+    <div id="text-workspace" style="display:none;" class="doc-text-wrapper">
+      <!-- Document Controls Toolbar -->
+      <div class="doc-text-toolbar">
+        <div class="doc-toolbar-left">
+          <div class="doc-search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="doc-search-input" class="doc-search-input" placeholder="Search in document...">
+            <button id="doc-search-clear" class="doc-search-clear" aria-label="Clear search">✕</button>
+          </div>
+          <span id="doc-stat-pages" class="doc-stat-pill"><strong>0</strong> Pages</span>
+          <span id="doc-stat-words" class="doc-stat-pill"><strong>0</strong> Words</span>
+          <span id="doc-stat-scanned" class="doc-stat-pill" style="display:none; color:#f59e0b; border-color:rgba(245, 158, 11, 0.3);">
+            <strong>0</strong> Scanned
+          </span>
+          <span id="doc-search-matches" class="doc-stat-pill" style="display:none; color:var(--hanko-red);">
+            <strong>0</strong> Matches
+          </span>
+        </div>
+
+        <div class="doc-toolbar-right">
+          <div class="doc-view-toggle">
+            <button id="btn-view-doc" class="doc-view-btn active" title="Document Paper View">
+              📄 Paper View
+            </button>
+            <button id="btn-view-raw" class="doc-view-btn" title="Raw Plaintext Stream">
+              💻 Plain Text
             </button>
           </div>
-          <textarea id="text-output" class="option-input" style="height: 240px; font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.6; resize: vertical; padding: 0.75rem;" readonly></textarea>
+          <button id="btn-ocr-all" class="btn-sheet-mini btn-ocr-highlight" style="display:none;">
+            ✨ OCR All Pages
+          </button>
+          <button id="btn-copy-all" class="btn-sheet-mini" title="Copy all document text">
+            📋 Copy All
+          </button>
+          <button id="btn-download-txt" class="btn-sheet-mini" title="Download as .txt">
+            ⬇ .txt
+          </button>
+          <button id="btn-download-md" class="btn-sheet-mini" title="Download formatted .md">
+            ⬇ .md
+          </button>
+          <button id="btn-download-docx" class="btn-sheet-mini" title="Download Word document (.docx)">
+            ⬇ .docx
+          </button>
+          <button id="btn-change-file" class="btn-sheet-mini" title="Choose another PDF">
+            ✕ Close
+          </button>
         </div>
       </div>
-      <div class="action-bar">
-        <button id="btn-change-file" class="btn-secondary">Choose another PDF</button>
-        <button id="btn-download-txt" class="btn-primary">Download .txt File</button>
+
+      <!-- Document Paper View Container -->
+      <div id="doc-sheets-container" class="doc-sheets-container"></div>
+
+      <!-- Raw Stream Textarea Container -->
+      <div id="doc-raw-container" class="doc-raw-container">
+        <textarea id="doc-raw-textarea" class="doc-raw-textarea" placeholder="Extracted plaintext will appear here..." readonly></textarea>
       </div>
     </div>
   `;
 
   const dropArea = container.querySelector('#drop-area');
   const workspace = container.querySelector('#text-workspace');
-  const textOutput = container.querySelector('#text-output');
-  const copyBtn = container.querySelector('#btn-copy-text');
-  const downloadBtn = container.querySelector('#btn-download-txt');
+  const sheetsContainer = container.querySelector('#doc-sheets-container');
+  const rawContainer = container.querySelector('#doc-raw-container');
+  const rawTextarea = container.querySelector('#doc-raw-textarea');
+  const searchInput = container.querySelector('#doc-search-input');
+  const searchClear = container.querySelector('#doc-search-clear');
+  const statPages = container.querySelector('#doc-stat-pages');
+  const statWords = container.querySelector('#doc-stat-words');
+  const statScanned = container.querySelector('#doc-stat-scanned');
+  const statMatches = container.querySelector('#doc-search-matches');
+  const btnViewDoc = container.querySelector('#btn-view-doc');
+  const btnViewRaw = container.querySelector('#btn-view-raw');
+  const btnOcrAll = container.querySelector('#btn-ocr-all');
+  const btnCopyAll = container.querySelector('#btn-copy-all');
+  const btnDownloadTxt = container.querySelector('#btn-download-txt');
+  const btnDownloadMd = container.querySelector('#btn-download-md');
+  const btnDownloadDocx = container.querySelector('#btn-download-docx');
   const changeFileBtn = container.querySelector('#btn-change-file');
 
+  // Compute full text across all pages
+  function getFullDocumentText(format = 'txt') {
+    if (pagesData.length === 0) return '';
+    if (format === 'md') {
+      return pagesData.map(p => `## Page ${p.pageNum}\n\n${p.text || '*(Empty page)*'}`).join('\n\n---\n\n');
+    }
+    return pagesData.map(p => `--- PAGE ${p.pageNum} ---\n${p.text}`).join('\n\n');
+  }
+
+  // Update header stats
+  function updateStats() {
+    statPages.innerHTML = `<strong>${pagesData.length}</strong> ${pagesData.length === 1 ? 'Page' : 'Pages'}`;
+    const allText = pagesData.map(p => p.text).join(' ');
+    const words = allText.trim() ? allText.trim().split(/\s+/).length : 0;
+    statWords.innerHTML = `<strong>${words.toLocaleString()}</strong> Words`;
+
+    const scannedCount = pagesData.filter(p => p.isScanned && !p.isOcrDone).length;
+    if (scannedCount > 0) {
+      statScanned.style.display = 'inline-flex';
+      statScanned.innerHTML = `<strong>${scannedCount}</strong> Scanned`;
+      btnOcrAll.style.display = 'inline-flex';
+      btnOcrAll.textContent = `✨ OCR ${scannedCount} Scanned ${scannedCount === 1 ? 'Page' : 'Pages'}`;
+    } else {
+      statScanned.style.display = 'none';
+      btnOcrAll.style.display = 'none';
+    }
+
+    rawTextarea.value = getFullDocumentText('txt');
+  }
+
+  // Escape HTML helper
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Render text with search highlighting
+  function formatSheetText(text, query) {
+    if (!text || !text.trim()) {
+      return '<span style="color:var(--ink-muted); font-style:italic;">(No selectable text on this page)</span>';
+    }
+    const safe = escapeHtml(text);
+    if (!query || !query.trim()) return safe;
+
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    return safe.replace(regex, '<mark class="doc-search-match">$1</mark>');
+  }
+
+  // Render individual paper sheet
+  function renderSheetDom(p) {
+    const sheet = document.createElement('div');
+    sheet.className = 'doc-paper-sheet';
+    sheet.id = `doc-sheet-${p.pageNum}`;
+
+    let statusBadge = '<span class="doc-tag-badge tag-ready">Text Extracted</span>';
+    if (p.isOcrDone) {
+      statusBadge = '<span class="doc-tag-badge tag-ocr">✨ OCR Extracted</span>';
+    } else if (p.isScanned) {
+      statusBadge = '<span class="doc-tag-badge tag-scanned">⚠ Scanned Image</span>';
+    }
+
+    const ocrBtnVisible = (!p.isOcrDone) ? '' : 'style="display:none;"';
+
+    sheet.innerHTML = `
+      <div class="doc-sheet-header">
+        <div class="doc-sheet-badge-group">
+          <span class="doc-page-badge">Page ${p.pageNum} of ${pagesData.length}</span>
+          ${statusBadge}
+        </div>
+        <div class="doc-sheet-actions">
+          <button class="btn-sheet-mini btn-page-copy" data-page="${p.pageNum}">
+            📋 Copy Page
+          </button>
+          <button class="btn-sheet-mini btn-ocr-highlight btn-page-ocr" data-page="${p.pageNum}" ${ocrBtnVisible}>
+            ✨ Run OCR
+          </button>
+        </div>
+      </div>
+
+      <div class="ocr-progress-box-wrapper" style="padding: 0 1.25rem;"></div>
+
+      ${(p.isScanned && !p.isOcrDone && !p.isOcrRunning && (!p.text || p.text.length < 25)) ? `
+        <div class="doc-scanned-notice">
+          <div class="doc-scanned-info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <div>
+              <strong>Scanned Page Detected (Image Only)</strong>
+              <div style="font-size:0.75rem; color:var(--ink-secondary);">Run on-device OCR to read and extract text from this page.</div>
+            </div>
+          </div>
+          <button class="btn-sheet-mini btn-ocr-highlight btn-page-ocr" data-page="${p.pageNum}">
+            ✨ Extract Text via OCR
+          </button>
+        </div>
+      ` : ''}
+
+      <div class="doc-sheet-body" id="doc-sheet-body-${p.pageNum}">${formatSheetText(p.text, searchQuery)}</div>
+    `;
+
+    // Bind Copy Page button
+    const copyBtn = sheet.querySelector('.btn-page-copy');
+    copyBtn.addEventListener('click', async () => {
+      if (!p.text) {
+        UI.toast('No text to copy on this page.', 'info');
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(p.text);
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => { copyBtn.textContent = '📋 Copy Page'; }, 2000);
+        UI.toast(`Page ${p.pageNum} text copied!`, 'success');
+      } catch {
+        UI.toast('Failed to copy to clipboard', 'error');
+      }
+    });
+
+    // Bind OCR Page button(s)
+    sheet.querySelectorAll('.btn-page-ocr').forEach(btn => {
+      btn.addEventListener('click', () => runOcrForPage(p.pageNum));
+    });
+
+    return sheet;
+  }
+
+  // Render all paper sheets
+  function renderAllSheets() {
+    sheetsContainer.innerHTML = '';
+    pagesData.forEach(p => {
+      sheetsContainer.appendChild(renderSheetDom(p));
+    });
+    applySearchFilter();
+  }
+
+  // Run OCR on a single page
+  async function runOcrForPage(pageNum) {
+    const pageData = pagesData.find(p => p.pageNum === pageNum);
+    if (!pageData || pageData.isOcrRunning) return;
+
+    const sheetElem = document.getElementById(`doc-sheet-${pageNum}`);
+    if (!sheetElem) return;
+
+    const progressWrapper = sheetElem.querySelector('.ocr-progress-box-wrapper');
+    progressWrapper.innerHTML = `
+      <div class="ocr-progress-container">
+        <div class="ocr-progress-bar">
+          <div class="ocr-progress-fill" id="ocr-fill-${pageNum}" style="width: 5%;"></div>
+        </div>
+        <span class="ocr-progress-label" id="ocr-label-${pageNum}">0%</span>
+      </div>
+    `;
+
+    pageData.isOcrRunning = true;
+    const ocrBtns = sheetElem.querySelectorAll('.btn-page-ocr');
+    ocrBtns.forEach(b => {
+      b.disabled = true;
+      b.textContent = '⏳ Processing...';
+    });
+
+    try {
+      UI.toast(`Running OCR on Page ${pageNum}...`, 'info');
+      const ocrResult = await PDFEngine.ocrPageToText(pdfDoc, pageNum, (pct) => {
+        const fill = document.getElementById(`ocr-fill-${pageNum}`);
+        const label = document.getElementById(`ocr-label-${pageNum}`);
+        if (fill) fill.style.width = `${pct}%`;
+        if (label) label.textContent = `${pct}%`;
+      });
+
+      pageData.text = ocrResult.text;
+      pageData.charCount = ocrResult.text.length;
+      pageData.isScanned = false;
+      pageData.isOcrDone = true;
+      pageData.isOcrRunning = false;
+
+      // Replace sheet DOM with updated content
+      const updatedSheet = renderSheetDom(pageData);
+      sheetElem.replaceWith(updatedSheet);
+
+      updateStats();
+      UI.toast(`Page ${pageNum} OCR completed (${ocrResult.confidence}% confidence)!`, 'success');
+    } catch (err) {
+      console.error(err);
+      pageData.isOcrRunning = false;
+      progressWrapper.innerHTML = '';
+      ocrBtns.forEach(b => {
+        b.disabled = false;
+        b.textContent = '✨ Run OCR';
+      });
+      UI.toast(`OCR failed for Page ${pageNum}: ` + err.message, 'error');
+    }
+  }
+
+  // Batch OCR on all scanned pages
+  async function runOcrAllScanned() {
+    const scannedPages = pagesData.filter(p => p.isScanned && !p.isOcrDone);
+    if (scannedPages.length === 0) {
+      UI.toast('No scanned pages need OCR.', 'info');
+      return;
+    }
+
+    btnOcrAll.disabled = true;
+    UI.toast(`Starting batch OCR on ${scannedPages.length} scanned pages...`, 'info');
+
+    for (let i = 0; i < scannedPages.length; i++) {
+      const p = scannedPages[i];
+      btnOcrAll.textContent = `⏳ Running OCR (${i + 1}/${scannedPages.length})...`;
+      await runOcrForPage(p.pageNum);
+    }
+
+    btnOcrAll.disabled = false;
+    updateStats();
+    UI.toast('All scanned pages processed with OCR!', 'success');
+  }
+
+  // In-document search
+  function applySearchFilter() {
+    searchQuery = (searchInput.value || '').trim();
+    if (searchQuery) {
+      searchClear.style.display = 'inline-flex';
+    } else {
+      searchClear.style.display = 'none';
+      statMatches.style.display = 'none';
+    }
+
+    let totalMatches = 0;
+    pagesData.forEach(p => {
+      const body = document.getElementById(`doc-sheet-body-${p.pageNum}`);
+      if (body) {
+        body.innerHTML = formatSheetText(p.text, searchQuery);
+      }
+      if (searchQuery && p.text) {
+        const matches = p.text.match(new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+        if (matches) totalMatches += matches.length;
+      }
+    });
+
+    if (searchQuery) {
+      statMatches.style.display = 'inline-flex';
+      statMatches.innerHTML = `<strong>${totalMatches}</strong> ${totalMatches === 1 ? 'Match' : 'Matches'}`;
+      if (totalMatches > 0) {
+        const firstMatch = sheetsContainer.querySelector('mark.doc-search-match');
+        if (firstMatch) {
+          firstMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }
+
+  // Event Listeners for Toolbar
+  searchInput.addEventListener('input', applySearchFilter);
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    applySearchFilter();
+    searchInput.focus();
+  });
+
+  btnViewDoc.addEventListener('click', () => {
+    activeView = 'document';
+    btnViewDoc.classList.add('active');
+    btnViewRaw.classList.remove('active');
+    sheetsContainer.style.display = 'flex';
+    rawContainer.style.display = 'none';
+  });
+
+  btnViewRaw.addEventListener('click', () => {
+    activeView = 'raw';
+    btnViewRaw.classList.add('active');
+    btnViewDoc.classList.remove('active');
+    sheetsContainer.style.display = 'none';
+    rawContainer.style.display = 'flex';
+    rawTextarea.value = getFullDocumentText('txt');
+  });
+
+  btnOcrAll.addEventListener('click', runOcrAllScanned);
+
+  btnCopyAll.addEventListener('click', async () => {
+    const fullText = getFullDocumentText('txt');
+    if (!fullText) {
+      UI.toast('No text available to copy.', 'info');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(fullText);
+      btnCopyAll.textContent = '✓ Copied All!';
+      setTimeout(() => { btnCopyAll.textContent = '📋 Copy All'; }, 2000);
+      UI.toast('All document text copied to clipboard!', 'success');
+    } catch {
+      rawTextarea.select();
+      document.execCommand('copy');
+      UI.toast('All document text copied to clipboard!', 'success');
+    }
+  });
+
+  btnDownloadTxt.addEventListener('click', () => {
+    const fullText = getFullDocumentText('txt');
+    if (!fullText) return;
+    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+    const baseName = originalFilename.replace(/\.[^/.]+$/, '');
+    PDFEngine.downloadBlob(blob, `${baseName}-text.txt`, 'text/plain');
+    UI.toast('Text document (.txt) downloaded!', 'success');
+  });
+
+  btnDownloadMd.addEventListener('click', () => {
+    const fullMd = getFullDocumentText('md');
+    if (!fullMd) return;
+    const blob = new Blob([fullMd], { type: 'text/markdown;charset=utf-8' });
+    const baseName = originalFilename.replace(/\.[^/.]+$/, '');
+    PDFEngine.downloadBlob(blob, `${baseName}-document.md`, 'text/markdown');
+    UI.toast('Markdown document (.md) downloaded!', 'success');
+  });
+
+  btnDownloadDocx.addEventListener('click', async () => {
+    if (pagesData.length === 0) return;
+    try {
+      UI.setButtonLoading(btnDownloadDocx, true, 'Generating...');
+      const docxBlob = await PDFEngine.generateDocxBlob(pagesData);
+      const baseName = originalFilename.replace(/\.[^/.]+$/, '');
+      PDFEngine.downloadBlob(docxBlob, `${baseName}-document.docx`, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      UI.toast('Word document (.docx) downloaded!', 'success');
+    } catch (err) {
+      console.error(err);
+      UI.toast('Failed to generate .docx: ' + err.message, 'error');
+    } finally {
+      UI.setButtonLoading(btnDownloadDocx, false);
+      btnDownloadDocx.innerHTML = '⬇ .docx';
+    }
+  });
+
+  changeFileBtn.addEventListener('click', () => {
+    pdfDoc = null;
+    pagesData = [];
+    searchQuery = '';
+    searchInput.value = '';
+    rawTextarea.value = '';
+    sheetsContainer.innerHTML = '';
+    dropArea.style.display = 'block';
+    workspace.style.display = 'none';
+  });
+
+  // Dropzone Setup
   const dropzone = UI.createDropzone({
     accept: '.pdf',
     multiple: false,
-    title: 'Drop PDF to extract text',
-    desc: 'Extract clean selectable text layer into readable plaintext',
+    title: 'Drop PDF to extract document text',
+    desc: 'Extract clean formatted layout with on-device OCR for scanned pages',
     onFiles: async (files) => {
       const file = files[0];
       if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
@@ -2546,54 +3189,41 @@ function renderPdfToTextTool(container) {
       }
       originalFilename = file.name;
       try {
+        UI.toast('Loading and analyzing PDF structure...', 'info');
         const bytes = await PDFEngine.readFileAsArrayBuffer(file);
-        const pdf = await PDFEngine.loadPDFJSDoc(bytes);
-        let fullText = '';
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageStrings = textContent.items.map(item => item.str);
-          fullText += `--- PAGE ${i} ---\n` + pageStrings.join(' ') + '\n\n';
+        pdfDoc = await PDFEngine.loadPDFJSDoc(bytes);
+        pagesData = [];
+
+        // Extract layout text for each page
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+          const page = await pdfDoc.getPage(i);
+          const layout = await PDFEngine.extractPageLayoutText(page);
+          pagesData.push({
+            pageNum: i,
+            text: layout.text,
+            lines: layout.lines,
+            charCount: layout.charCount,
+            isScanned: layout.isScanned,
+            isOcrDone: false,
+            isOcrRunning: false,
+            ocrProgress: 0
+          });
         }
 
-        extractedText = fullText.trim();
-        textOutput.value = extractedText;
+        updateStats();
+        renderAllSheets();
+
         dropArea.style.display = 'none';
-        workspace.style.display = 'block';
+        workspace.style.display = 'flex';
+        UI.toast(`Extracted ${pagesData.length} ${pagesData.length === 1 ? 'page' : 'pages'} with spatial layout!`, 'success');
       } catch (err) {
         console.error(err);
-        UI.toast('Failed to extract text: ' + err.message, 'error');
+        UI.toast('Failed to analyze PDF: ' + err.message, 'error');
       }
     }
   });
+
   dropArea.appendChild(dropzone);
-
-  changeFileBtn.addEventListener('click', () => {
-    extractedText = '';
-    textOutput.value = '';
-    dropArea.style.display = 'block';
-    workspace.style.display = 'none';
-  });
-
-  copyBtn.addEventListener('click', async () => {
-    if (!extractedText) return;
-    try {
-      await navigator.clipboard.writeText(extractedText);
-      UI.toast('Text copied to clipboard!', 'success');
-    } catch {
-      textOutput.select();
-      document.execCommand('copy');
-      UI.toast('Text copied to clipboard!', 'success');
-    }
-  });
-
-  downloadBtn.addEventListener('click', () => {
-    if (!extractedText) return;
-    const blob = new Blob([extractedText], { type: 'text/plain;charset=utf-8' });
-    const baseName = originalFilename.replace(/\.[^/.]+$/, '');
-    PDFEngine.downloadBlob(blob, `${baseName}-text.txt`, 'text/plain');
-    UI.toast('Text file downloaded!', 'success');
-  });
 }
 
 // 12. Crop & Margin Trim PDF (Interactive Draggable Viewport)

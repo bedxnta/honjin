@@ -24,19 +24,18 @@ export const UI = {
       closeBtn.addEventListener('click', () => this.closeDialog());
     }
 
-    // Close when clicking dialog backdrop
     if (this.dialog) {
-      this.dialog.addEventListener('click', (e) => {
-        const rect = this.dialog.getBoundingClientRect();
-        const isInDialog = (
-          rect.top <= e.clientY &&
-          e.clientY <= rect.top + rect.height &&
-          rect.left <= e.clientX &&
-          e.clientX <= rect.left + rect.width
-        );
-        if (!isInDialog) {
-          this.closeDialog();
+      // Prevent scrolling the background when wheeling over the backdrop
+      this.dialog.addEventListener('wheel', (e) => {
+        if (e.target === this.dialog) {
+          e.preventDefault();
         }
+      }, { passive: false });
+
+      // Restore body scroll lock on native dialog close / cancel
+      this.dialog.addEventListener('close', () => {
+        document.body.classList.remove('modal-open');
+        this.dialogBody.innerHTML = '';
       });
     }
 
@@ -61,6 +60,8 @@ export const UI = {
 
     renderContent(this.dialogBody);
 
+    document.body.classList.add('modal-open');
+
     if (typeof this.dialog.showModal === 'function') {
       this.dialog.showModal();
     } else {
@@ -73,6 +74,7 @@ export const UI = {
    */
   closeDialog() {
     if (this.dialog) {
+      document.body.classList.remove('modal-open');
       if (typeof this.dialog.close === 'function') {
         this.dialog.close();
       } else {

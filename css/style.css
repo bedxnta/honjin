@@ -744,6 +744,11 @@ body.theme-light .cat-pill.active {
 /* ==========================================================================
    Universal Tool Dialog & Modal (Raycast-Style Dark Glass)
    ========================================================================== */
+body.modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
 .tool-dialog {
   border: none;
   background: transparent;
@@ -753,6 +758,7 @@ body.theme-light .cat-pill.active {
   width: calc(100% - 2rem);
   max-height: 90vh;
   z-index: 100;
+  overscroll-behavior: none;
 }
 
 .tool-dialog::backdrop {
@@ -760,6 +766,8 @@ body.theme-light .cat-pill.active {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   animation: fadeIn 180ms ease-out;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .dialog-frame {
@@ -861,10 +869,13 @@ body.theme-light .cat-pill.active {
 }
 
 .dialog-body {
-  padding: 1.75rem;
+  padding: 1.5rem 1.75rem;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow-x: hidden;
   color: var(--ink-primary);
+  flex: 1 1 auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ==========================================================================

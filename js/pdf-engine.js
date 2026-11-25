@@ -159,5 +159,240 @@ export const PDFEngine = {
       }
     }
     return Array.from(pages).sort((a, b) => a - b);
+  },
+
+  /**
+   * Reconstruct clean spatial text layout from a PDF.js page
+   * Preserves horizontal gaps, columns, indentations, and vertical paragraph breaks.
+   */
+  async extractPageLayoutText(page) {
+    const textContent = await page.getTextContent({ normalizeWhitespace: false });
+    const items = textContent.items.filter(item => item.str && item.str.trim().length > 0);
+    
+    if (items.length === 0) {
+      return { text: '', lines: [], charCount: 0, isScanned: true };
+    }
+
+    // Sort items vertically (descending Y from top to bottom)
+    const sorted = [...items].sort((a, b) => {
+      const yA = a.transform[5];
+      const yB = b.transform[5];
+      if (Math.abs(yA - yB) > 3.5) {
+        return yB - yA; // top first
+      }
+      return a.transform[4] - b.transform[4]; // left to right
+    });
+
+    // Group items into horizontal lines
+    const lineBuckets = [];
+    for (const item of sorted) {
+      const x = item.transform[4];
+      const y = item.transform[5];
+      const width = item.width || 0;
+      const height = item.height || Math.abs(item.transform[0]) || 12;
+
+      let bucket = lineBuckets.find(b => Math.abs(b.y - y) <= Math.max(3.5, height * 0.4));
+      if (!bucket) {
+        bucket = { y, height, items: [] };
+        lineBuckets.push(bucket);
+      }
+      bucket.items.push({ x, y, width, height, str: item.str });
+    }
+
+    // Sort buckets vertically (top to bottom)
+    lineBuckets.sort((a, b) => b.y - a.y);
+
+    const formattedLines = [];
+    let avgLineHeight = 12;
+    if (lineBuckets.length > 0) {
+      const totalH = lineBuckets.reduce((acc, b) => acc + (b.height || 12), 0);
+      avgLineHeight = totalH / lineBuckets.length;
+    }
+
+    for (let i = 0; i < lineBuckets.length; i++) {
+      const bucket = lineBuckets[i];
+      // Sort items within line from left to right
+      bucket.items.sort((a, b) => a.x - b.x);
+
+      let lineText = '';
+      let prevEnd = null;
+
+      for (const item of bucket.items) {
+        if (prevEnd !== null) {
+          const gap = item.x - prevEnd;
+          if (gap > 24) {
+            lineText += '    ';
+          } else if (gap > 3.5 && !lineText.endsWith(' ') && !item.str.startsWith(' ')) {
+            lineText += ' ';
+          }
+        }
+        lineText += item.str;
+        prevEnd = item.x + item.width;
+      }
+
+      lineText = lineText.trimEnd();
+      if (!lineText) continue;
+
+      let isParagraphBreak = false;
+      if (i > 0) {
+        const prevBucket = lineBuckets[i - 1];
+        const vGap = prevBucket.y - bucket.y;
+        if (vGap > avgLineHeight * 1.65) {
+          isParagraphBreak = true;
+        }
+      }
+
+      formattedLines.push({
+        y: bucket.y,
+        text: lineText,
+        isParagraphBreak
+      });
+    }
+
+    let fullText = '';
+    for (let i = 0; i < formattedLines.length; i++) {
+      const line = formattedLines[i];
+      if (i > 0) {
+        fullText += line.isParagraphBreak ? '\n\n' : '\n';
+      }
+      fullText += line.text;
+    }
+
+    const charCount = fullText.trim().length;
+    return {
+      text: fullText,
+      lines: formattedLines,
+      charCount,
+      isScanned: charCount < 20
+    };
+  },
+
+  /**
+   * On-device OCR using Tesseract.js WebAssembly
+   */
+  async ocrPageToText(pdfDoc, pageNumber, onProgress) {
+    if (!window.Tesseract) {
+      throw new Error('Tesseract.js OCR engine is not loaded. Please check your internet connection or reload.');
+    }
+    const canvas = document.createElement('canvas');
+    await PDFEngine.renderPageToCanvas(pdfDoc, pageNumber, canvas, 2.0);
+
+    const result = await window.Tesseract.recognize(canvas, 'eng', {
+      logger: (m) => {
+        if (onProgress && m.status === 'recognizing text') {
+          onProgress(Math.round((m.progress || 0) * 100));
+        }
+      }
+    });
+
+    const ocrText = (result.data && result.data.text) ? result.data.text.trim() : '';
+    return {
+      text: ocrText,
+      confidence: result.data ? Math.round(result.data.confidence) : 0
+    };
+  },
+
+  /**
+   * Generate a standard Microsoft Word (.docx) file from extracted pages
+   * Uses window.JSZip to build valid OpenXML archive client-side.
+   */
+  async generateDocxBlob(pagesData) {
+    if (!window.JSZip) throw new Error('JSZip library not available');
+
+    const zip = new window.JSZip();
+
+    // 1. [Content_Types].xml
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+    zip.file('[Content_Types].xml', contentTypesXml);
+
+    // 2. _rels/.rels
+    const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+    zip.file('_rels/.rels', rootRelsXml);
+
+    // 3. word/document.xml
+    function escapeXml(unsafe) {
+      return (unsafe || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    let bodyXml = '';
+    pagesData.forEach((p, idx) => {
+      // Page Heading
+      bodyXml += `<w:p>
+        <w:pPr>
+          <w:spacing w:before="240" w:after="120"/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:color w:val="0F172A"/>
+          </w:rPr>
+          <w:t>Page ${p.pageNum}</w:t>
+        </w:r>
+      </w:p>`;
+
+      const paragraphs = (p.text || '').split(/\n\n+/);
+      paragraphs.forEach((para) => {
+        const trimmed = para.trim();
+        if (!trimmed) return;
+        bodyXml += `<w:p>
+          <w:pPr>
+            <w:spacing w:after="160" w:line="276" w:lineRule="auto"/>
+          </w:pPr>`;
+        const lines = trimmed.split(/\n/);
+        lines.forEach((line, lIdx) => {
+          if (lIdx > 0) {
+            bodyXml += `<w:r><w:br/></w:r>`;
+          }
+          bodyXml += `<w:r>
+            <w:rPr>
+              <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+              <w:sz w:val="22"/>
+              <w:color w:val="1E293B"/>
+            </w:rPr>
+            <w:t xml:space="preserve">${escapeXml(line)}</w:t>
+          </w:r>`;
+        });
+        bodyXml += `</w:p>`;
+      });
+
+      // Page break if not last page
+      if (idx < pagesData.length - 1) {
+        bodyXml += `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
+      }
+    });
+
+    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    ${bodyXml}
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+    zip.file('word/document.xml', docXml);
+
+    return await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
   }
 };
